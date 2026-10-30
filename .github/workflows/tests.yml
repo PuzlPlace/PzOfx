@@ -1,0 +1,110 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+      - production
+  pull_request:
+    branches:
+      - master
+      - production
+
+permissions:
+  contents: write
+
+jobs:
+  phpunit:
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # PHP ^8.1 do pacote × majors do illuminate suportados (10→8.1, 11/12→8.2, 13→8.3).
+      matrix:
+        php: ['8.1', '8.2', '8.3', '8.4']
+        laravel: ['10', '11', '12', '13']
+        exclude:
+          - { php: '8.1', laravel: '11' }
+          - { php: '8.1', laravel: '12' }
+          - { php: '8.1', laravel: '13' }
+          - { php: '8.2', laravel: '13' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, xml, simplexml
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-php${{ matrix.php }}-laravel${{ matrix.laravel }}-${{ hashFiles('**/composer.json') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php${{ matrix.php }}-laravel${{ matrix.laravel }}-
+            composer-${{ runner.os }}-
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-lock
+
+      - name: Pin Laravel major
+        run: composer require --dev --no-update "illuminate/support:^${{ matrix.laravel }}.0" "illuminate/config:^${{ matrix.laravel }}.0" "illuminate/container:^${{ matrix.laravel }}.0"
+
+      - name: Install dependencies
+        run: composer update --no-interaction --prefer-dist --no-progress
+
+      - name: Run tests
+        run: composer test
+
+  # Check único exigido pelo ruleset de master (required_status_checks: php-tests).
+  php-tests:
+    name: php-tests
+    needs: phpunit
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.phpunit.result }}" = "success"
+
+  # Entrega em production com CI verde vira versão sozinha. A versão nunca é
+  # escrita à mão: nem no commit, nem no composer.json — sai da última tag.
+  release:
+    name: Release
+    needs: php-tests
+    if: github.ref == 'refs/heads/production' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    # Serializa pushes seguidos; dois jobs simultâneos calculariam a mesma tag.
+    concurrency:
+      group: release
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: bump
+        name: Compute next tag
+        run: |
+          last=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$last" ]; then
+            next="v1.0.0"
+          else
+            IFS=. read -r maj min pat <<< "${last#v}"
+            next="v$maj.$min.$((pat + 1))"
+          fi
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      # Sempre patch. Para subir minor/major, criar a tag na mão uma vez
+      # (git tag v1.1.0 && git push origin v1.1.0) — o cálculo segue dela.
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.bump.outputs.tag }}" \
+            --target "$GITHUB_SHA" \
+            --title "${{ steps.bump.outputs.tag }}" \
+            --generate-notes

@@ -1,0 +1,47 @@
+{
+    "name": "puzl/pzofx",
+    "description": "Leitura robusta de extratos OFX (1.x SGML e 2.x XML) de qualquer banco: conta corrente e cartão, múltiplas contas, valores exatos, datas sem deslocamento de fuso, deduplicação e perfis por banco — sucessor do App\\Library\\Ofx\\Ofx.",
+    "type": "library",
+    "license": "proprietary",
+    "keywords": ["ofx", "ofx-parser", "bank-statement", "extrato", "conciliacao-bancaria", "laravel", "puzl"],
+    "require": {
+        "php": "^8.1",
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+        "illuminate/config": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/container": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "nesbot/carbon": "^2.72|^3.0",
+        "phpunit/phpunit": "^10.5"
+    },
+    "suggest": {
+        "illuminate/support": "Para o Service Provider (config publicável) e a regra de validação PzOfxFileRule no Laravel"
+    },
+    "autoload": {
+        "psr-4": {
+            "Puzl\\PzOfx\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Puzl\\PzOfx\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Puzl\\PzOfx\\Laravel\\PzOfxServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "phpunit -c phpunit.xml.dist",
+        "test:coverage": "phpunit -c phpunit.xml.dist --coverage-text"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
