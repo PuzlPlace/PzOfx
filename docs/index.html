@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PzOfx — leitura robusta de extratos OFX de qualquer banco: valores exatos, datas sem fuso, perfis por banco, deduplicação e substituto do Ofx.php.">
+  <title>PzOfx — Guia do Desenvolvedor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Paleta e tipografia do app da Puzl (mesmo padrão de puzl-account/docs). */
+    :root {
+      --bg: #f6f5f5;
+      --surface: #ffffff;
+      --text: #334155;        /* slate-700 */
+      --heading: #0f172a;     /* slate-900 */
+      --muted: #64748b;       /* slate-500 */
+      --faint: #94a3b8;       /* slate-400 */
+      --border: #e8e8e8;
+      --border-2: #e2e8f0;    /* slate-200 */
+      --brand-50: #eef6fc;
+      --brand-100: #d6e9f7;
+      --brand-200: #aed3ef;
+      --brand-500: #2a85cc;
+      --brand-600: #1a70b7;
+      --brand-700: #155a93;
+      --brand-900: #0c3354;
+      --code-bg: #0f172a;     /* slate-900 */
+      --code-text: #f1f5f9;   /* slate-100 */
+      --inline-bg: #eef1f4;
+      --inline-border: #dde3ea;
+      --amber-bg: #fffbeb; --amber-border: #fcd34d; --amber-text: #78350f;
+      --red-bg: #fef2f2;   --red-border: #fca5a5;   --red-text: #7f1d1d;
+      --green-bg: #ecfdf5; --green-border: #6ee7b7; --green-text: #064e3b;
+      --radius: .75rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 1rem;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: clip;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, h4 { font-family: 'Fredoka', 'Inter', system-ui, sans-serif; color: var(--heading); letter-spacing: -0.01em; }
+    a { color: var(--brand-600); }
+    a:hover { color: var(--brand-700); }
+    strong { font-weight: 600; color: var(--heading); }
+    p { margin: 0 0 1rem; }
+    ul, ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+    li { margin-bottom: .35rem; }
+
+    /* Barra de progresso de leitura */
+    #progress { position: fixed; top: 0; left: 0; height: 4px; background: var(--brand-600); z-index: 50; width: 0; transition: width .1s linear; }
+
+    /* Topo */
+    .topbar { position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border-2); }
+    .topbar-inner { max-width: 80rem; margin: 0 auto; padding: 0 1rem; height: 3.5rem; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: .625rem; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1.125rem; color: var(--heading); text-decoration: none; }
+    .brand-mark { width: 2rem; height: 2rem; border-radius: .5rem; background: var(--brand-600); color: #fff; display: grid; place-items: center; font-size: .9rem; }
+    .brand-pill { font-family: 'Inter', sans-serif; font-size: .75rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border-2); border-radius: 999px; padding: .125rem .5rem; margin-left: .25rem; }
+    .menu-toggle { display: none; font: inherit; font-size: .875rem; font-weight: 500; border: 1px solid #cbd5e1; border-radius: .5rem; padding: .375rem .75rem; background: #fff; cursor: pointer; color: var(--text); }
+
+    /* Layout */
+    .layout { max-width: 80rem; margin: 0 auto; padding: 0 1rem; display: grid; grid-template-columns: 260px 1fr; gap: 2.5rem; }
+    .sidebar { position: sticky; top: 5rem; height: calc(100vh - 6rem); overflow-y: auto; padding: 1.5rem 0; font-size: .875rem; }
+    .sidebar-brand { display: none; }
+    .nav-group { margin-bottom: 1rem; }
+    .nav-group-title { padding: 0 .75rem; margin-bottom: .5rem; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+    .sidebar a { display: block; padding: .375rem .75rem; border-radius: .375rem; color: #475569; text-decoration: none; transition: background .15s, color .15s; }
+    .sidebar a:hover { color: var(--heading); background: #fff; }
+    .sidebar a.active { color: var(--brand-700); background: var(--brand-50); font-weight: 600; }
+    .main { max-width: 48rem; min-width: 0; padding: 2.5rem 0 4rem; }
+
+    /* Hero */
+    .hero { margin-bottom: 4rem; }
+    .hero h2 { margin: 0 0 1rem; font-size: 2.25rem; font-weight: 700; line-height: 1.15; border: 0; padding: 0; }
+    .hero h2::before { content: none; }
+    .hero p { font-size: 1.125rem; color: #475569; max-width: 40rem; }
+    .hero-tags { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.25rem; }
+    .tag { font-size: .75rem; font-weight: 500; padding: .2rem .65rem; background: #fff; border: 1px solid var(--border-2); color: var(--muted); border-radius: 999px; }
+
+    /* Seções numeradas como no guia do Puzl Account */
+    .main { counter-reset: sec; }
+    section { margin-bottom: 4rem; }
+    section > h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 1rem; }
+    section > h2::before { counter-increment: sec; content: counter(sec) ". "; color: var(--brand-600); }
+    h3 { font-size: 1.125rem; font-weight: 600; margin: 2rem 0 .75rem; }
+    h4 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 .5rem; }
+
+    /* Cards */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin: 1.25rem 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+    .card h4 { margin: 0 0 .35rem; font-size: .95rem; color: var(--heading); }
+    .card p { margin: 0; font-size: .875rem; color: var(--muted); }
+
+    /* Callouts */
+    .callout { border-radius: var(--radius); padding: 1rem; margin: 1.25rem 0; font-size: .9rem; border: 1px solid; }
+    .callout p, .callout ul { color: inherit; }
+    .callout-title { font-weight: 600; margin-bottom: .35rem; }
+    .callout-info { background: var(--brand-50); border-color: var(--brand-600); border-left-width: 4px; color: var(--text); }
+    .callout-info .callout-title { color: var(--brand-900); }
+    .callout-warn { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber-text); }
+    .callout-danger { background: var(--red-bg); border-color: var(--red-border); color: var(--red-text); }
+    .callout-success { background: var(--green-bg); border-color: var(--green-border); color: var(--green-text); }
+
+    /* Código */
+    pre { position: relative; margin: 1rem 0; padding: 1rem; background: var(--code-bg); color: var(--code-text); border-radius: var(--radius); overflow-x: auto; }
+    pre code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .8125rem; line-height: 1.6; background: none; color: inherit; padding: 0; border: 0; }
+    code, kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .8em; background: var(--inline-bg); border: 1px solid var(--inline-border); border-radius: .375rem; padding: .05rem .35rem; color: var(--heading); overflow-wrap: anywhere; }
+    .copy-btn { position: absolute; top: .5rem; right: .5rem; font: 500 11px 'Inter', sans-serif; padding: .25rem .5rem; border: 0; border-radius: .25rem; background: #334155; color: #e2e8f0; cursor: pointer; }
+    .copy-btn:hover { background: #475569; }
+    .kw { color: #c084fc; }
+    .fn { color: #67e8f9; }
+    .str { color: #86efac; }
+    .cmt { color: #94a3b8; font-style: italic; }
+    .cls { color: #fcd34d; }
+    .var { color: #f9a8d4; }
+
+    /* Tabelas */
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .875rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: .75rem; text-align: left; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    th { background: #f8fafc; font-weight: 600; color: var(--muted); }
+    tr:last-child td { border-bottom: none; }
+    td code, p code, li code { overflow-wrap: anywhere; }
+
+    /* Comparação antes/depois */
+    .vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .vs-box { padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+    .vs-box.yes { border-color: var(--green-border); }
+    .vs-box.no { border-color: var(--red-border); }
+    .vs-box h4 { margin-top: 0; }
+    .vs-box pre { margin-bottom: 0; }
+
+    /* Lista de métodos */
+    .method { margin: 1rem 0; padding: .9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .method-sig { font-family: 'JetBrains Mono', monospace; font-size: .85rem; color: var(--brand-700); font-weight: 500; word-break: break-all; }
+    .method-desc { margin: .4rem 0 0; font-size: .9rem; color: var(--muted); }
+
+    footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-2); font-size: .75rem; color: var(--faint); }
+
+    @media (max-width: 1023px) {
+      .layout { display: block; }
+      .menu-toggle { display: inline-block; }
+      .sidebar { display: none; position: fixed; inset: 3.5rem 0 auto 0; height: auto; max-height: 70vh; z-index: 30; background: #fff; border-bottom: 1px solid var(--border-2); padding: 1rem; }
+      .sidebar.open { display: block; }
+      .main { padding: 1.5rem 0 4rem; }
+      .vs-grid { grid-template-columns: 1fr; }
+      .hero h2 { font-size: 1.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="#intro" class="brand">
+      <span class="brand-mark">P</span>
+      PzOfx
+      <span class="brand-pill">Guia do desenvolvedor</span>
+    </a>
+    <button id="menuBtn" class="menu-toggle" type="button" aria-expanded="false" aria-controls="toc">Sumário</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav id="toc" class="sidebar" aria-label="Sumário">
+    <div class="sidebar-brand">
+      <h1>PzOfx</h1>
+      <p>puzl/pzofx · PHP 8.1+</p>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Começar</div>
+      <a href="#intro">O que é</a>
+      <a href="#instalacao">Instalação</a>
+      <a href="#inicio-rapido">Início rápido</a>
+      <a href="#importacao">Importação típica</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Lendo o extrato</div>
+      <a href="#modelo">Documento, extrato e transação</a>
+      <a href="#valores">Valores</a>
+      <a href="#datas">Datas e fuso</a>
+      <a href="#encoding">Encoding e acentos</a>
+      <a href="#deduplicacao">Deduplicação</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Configurando</div>
+      <a href="#configuracao">Configuração</a>
+      <a href="#perfis">Perfis por banco</a>
+      <a href="#avisos">Avisos e modo estrito</a>
+      <a href="#erros">Erros e exceções</a>
+      <a href="#laravel">Laravel e injeção</a>
+      <a href="#testando">Testando</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Referência</div>
+      <a href="#pegadinhas">Pegadinhas dos bancos</a>
+      <a href="#migracao">Migrando do Ofx.php</a>
+      <a href="#diferencas">Diferenças de comportamento</a>
+      <a href="#seguranca">Segurança e limites</a>
+      <a href="#api">API resumida</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <header class="hero">
+      <p style="font-size:.875rem;font-weight:600;color:var(--brand-600);margin:0 0 .5rem">Leia isto primeiro</p>
+      <h2>Extrato OFX de qualquer banco, lido do jeito certo</h2>
+      <p>Cada banco gera OFX do seu jeito: tag sem fechamento, arquivo numa linha só, vírgula decimal, cabeçalho dizendo um encoding e mandando outro, FITID repetido, linha de saldo disfarçada de transação. O PzOfx absorve tudo isso e entrega um modelo limpo, com valores exatos e avisos do que veio fora do padrão.</p>
+      <div class="hero-tags">
+        <span class="tag">OFX 1.x SGML e 2.x XML</span>
+        <span class="tag">Conta e cartão</span>
+        <span class="tag">Valores exatos (string)</span>
+        <span class="tag">Dia do banco, sem fuso</span>
+        <span class="tag">Perfis por banco</span>
+        <span class="tag">Sem libxml / XXE</span>
+        <span class="tag">Substitui o Ofx.php</span>
+      </div>
+    </header>
+
+    <!-- ============================================================ -->
+    <section id="intro">
+      <h2>O que é o PzOfx?</h2>
+      <p>Uma biblioteca PHP para <strong>ler extratos bancários OFX</strong> e entregar transações prontas para conciliação. Não depende de framework; no Laravel ganha config publicável, singleton no container e regra de validação.</p>
+
+      <div class="cards">
+        <div class="card">
+          <h4>Tolerante</h4>
+          <p>Tokenizador próprio: não converte SGML em XML, então <code>&amp;</code> solto, <code>&lt;</code> no MEMO ou tag sem fechamento não derrubam a leitura.</p>
+        </div>
+        <div class="card">
+          <h4>Exato</h4>
+          <p><code>"-1.234,56"</code> vira <code>"-1234.56"</code> — string decimal, somas sem erro de float.</p>
+        </div>
+        <div class="card">
+          <h4>Configurável por banco</h4>
+          <p>De onde vem a descrição, o que fazer com o sinal, se o FITID é confiável — por BANKID, ORG, FID ou tipo de extrato.</p>
+        </div>
+        <div class="card">
+          <h4>Transparente</h4>
+          <p>Nada é corrigido em silêncio: cada desvio vira um aviso com código estável e mensagem em pt_BR/en.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="instalacao">
+      <h2>Instalação</h2>
+      <p>O pacote não está no Packagist. Declare o repositório e instale por versão:</p>
+<pre><code><span class="cmt">// composer.json da aplicação</span>
+"repositories": [
+    { "type": "vcs", "url": "https://github.com/PuzlPlace/PzOfx.git" }
+]</code></pre>
+<pre><code>composer require puzl/pzofx:^1.0</code></pre>
+      <p>Requisitos: PHP <code>^8.1</code> com <code>mbstring</code>. No Laravel 10–13 o Service Provider entra sozinho (auto-discovery). Publique a config só se precisar mudar algo:</p>
+<pre><code>php artisan vendor:publish --tag=pzofx-config</code></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="inicio-rapido">
+      <h2>Início rápido</h2>
+<pre><code><span class="kw">use</span> <span class="cls">Puzl\PzOfx\PzOfx</span>;
+
+<span class="var">$document</span>  = <span class="cls">PzOfx</span>::<span class="fn">fromFile</span>(<span class="var">$request</span>-&gt;<span class="fn">file</span>(<span class="str">'ofx'</span>));
+<span class="var">$statement</span> = <span class="var">$document</span>-&gt;<span class="fn">statement</span>();   <span class="cmt">// primeiro extrato</span>
+
+<span class="var">$statement</span>-&gt;account-&gt;<span class="fn">bankCode</span>();   <span class="cmt">// "341"</span>
+<span class="var">$statement</span>-&gt;<span class="fn">firstDate</span>();              <span class="cmt">// menor data entre as transações</span>
+<span class="var">$statement</span>-&gt;<span class="fn">total</span>();                  <span class="cmt">// "6437.10" — movimento líquido exato</span>
+
+<span class="kw">foreach</span> (<span class="var">$statement</span> <span class="kw">as</span> <span class="var">$transaction</span>) {
+    <span class="var">$transaction</span>-&gt;postedAt;      <span class="cmt">// DateTimeImmutable</span>
+    <span class="var">$transaction</span>-&gt;amount;        <span class="cmt">// "-1234.56"</span>
+    <span class="var">$transaction</span>-&gt;description;   <span class="cmt">// MEMO; se vazio, NAME</span>
+    <span class="var">$transaction</span>-&gt;uniqueId;      <span class="cmt">// FITID confiável ou fingerprint</span>
+}</code></pre>
+      <p>Entradas aceitas: <code>fromFile()</code> (caminho, <code>SplFileInfo</code>, <code>UploadedFile</code>), <code>fromString()</code> (conteúdo), <code>fromStream()</code> (recurso aberto) e <code>parse()</code>, que detecta sozinho.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="importacao">
+      <h2>Importação típica</h2>
+      <p>Validar no FormRequest, ler, conferir o banco, gravar dentro de transação:</p>
+<pre><code><span class="cmt">// FormRequest</span>
+<span class="str">'file'</span> =&gt; [<span class="str">'required'</span>, <span class="str">'file'</span>, <span class="str">'max:10240'</span>, <span class="kw">new</span> <span class="cls">PzOfxFileRule</span>()],
+
+<span class="cmt">// Service</span>
+<span class="var">$statement</span> = <span class="cls">PzOfx</span>::<span class="fn">fromFile</span>(<span class="var">$dto</span>-&gt;file)-&gt;<span class="fn">bankStatements</span>()[0]
+    ?? <span class="kw">throw new</span> <span class="cls">DefaultException</span>(<span class="str">'O arquivo não tem extrato de conta.'</span>);
+
+<span class="kw">if</span> (<span class="var">$statement</span>-&gt;account-&gt;<span class="fn">bankCode</span>() !== <span class="var">$bankAccount</span>-&gt;bank_code) { <span class="cmt">/* banco errado */</span> }
+
+<span class="kw">foreach</span> (<span class="var">$statement</span>-&gt;<span class="fn">sortedByDate</span>() <span class="kw">as</span> <span class="var">$t</span>) {
+    <span class="var">$lines</span>[] = [
+        <span class="str">'type'</span>        =&gt; <span class="var">$t</span>-&gt;<span class="fn">direction</span>()-&gt;value,   <span class="cmt">// CREDIT | DEBIT</span>
+        <span class="str">'date_at'</span>     =&gt; <span class="var">$t</span>-&gt;postedAt-&gt;<span class="fn">format</span>(<span class="str">'Y-m-d H:i:s'</span>),
+        <span class="str">'value'</span>       =&gt; <span class="var">$t</span>-&gt;amount,
+        <span class="str">'fit_id'</span>      =&gt; <span class="var">$t</span>-&gt;uniqueId,
+        <span class="str">'description'</span> =&gt; <span class="var">$t</span>-&gt;description,
+    ];
+}</code></pre>
+      <div class="callout callout-info">
+        <div class="callout-title">Período da conciliação</div>
+        <p>Use <code>[$inicio, $fim] = $statement-&gt;period()</code>: sempre em ordem, pela menor e maior data das transações (sem transações, o período declarado). O <code>DTSTART</code>/<code>DTEND</code> declarado nem sempre cobre as transações, e a ordem do arquivo varia por banco.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="modelo">
+      <h2>Documento, extrato e transação</h2>
+      <p>As classes ficam em <code>Puzl\PzOfx\Data</code> (não confundir com Model do Eloquent nem com as Entities da aplicação: são só os dados lidos do arquivo). Tudo é imutável (propriedades <code>readonly</code>) e serializável com <code>toArray()</code>.</p>
+      <table>
+        <tr><th>Classe</th><th>O que tem</th></tr>
+        <tr><td><code>PzOfxDocument</code></td><td><code>header</code>, <code>signOn</code>, <code>statements</code>, <code>warnings</code>; <code>statement()</code>, <code>bankStatements()</code>, <code>creditCardStatements()</code>, <code>transactions()</code>, <code>warningsOf()</code></td></tr>
+        <tr><td><code>PzOfxStatement</code></td><td><code>type</code> (bank/credit_card), <code>account</code>, <code>currency</code>, <code>startDate</code>/<code>endDate</code> declarados, <code>transactions</code>, <code>ledgerBalance</code>, <code>availableBalance</code>, <code>status</code>, <code>profile</code> aplicado. Iterável e contável; <code>period()</code>, <code>firstDate()</code>, <code>lastDate()</code>, <code>sortedByDate()</code>, <code>credits()</code>, <code>debits()</code>, <code>total()</code>, <code>totalCredits()</code>, <code>totalDebits()</code>, <code>duplicateFitIds()</code></td></tr>
+        <tr><td><code>PzOfxAccount</code></td><td><code>bankId</code>, <code>branchId</code>, <code>accountId</code> brutos; <code>bankCode()</code> (COMPE com 3 dígitos), <code>bankName()</code>, <code>number()</code>, <code>digit()</code>, <code>key()</code></td></tr>
+        <tr><td><code>PzOfxTransaction</code></td><td><code>index</code> (posição no arquivo), <code>type</code> + <code>rawType</code>, <code>postedAt</code>, <code>userDate</code>, <code>availableAt</code>, <code>amount</code>, <code>fitId</code>, <code>name</code>, <code>memo</code>, <code>description</code>, <code>checkNumber</code>, <code>referenceNumber</code>, <code>correctFitId</code>/<code>correctAction</code>, <code>currency</code>, <code>fingerprint</code>, <code>uniqueId</code>, <code>raw</code>; <code>direction()</code>, <code>isCredit()</code>, <code>amountCents()</code>, <code>rawField()</code></td></tr>
+        <tr><td><code>PzOfxSignOn</code></td><td><code>status</code>, <code>serverDate</code>, <code>language</code>, <code>organization</code> (ORG), <code>fid</code></td></tr>
+        <tr><td><code>PzOfxHeader</code></td><td><code>version()</code>, <code>charset()</code>, <code>encoding()</code>, <code>isXml</code>, <code>get()</code></td></tr>
+      </table>
+      <p>Um arquivo pode ter <strong>várias contas e cartões</strong>: <code>statement()</code> devolve o primeiro; percorra <code>statements</code> para todos. Campos proprietários (<code>&lt;BANCO.CANAL&gt;</code>) ficam em <code>$transaction-&gt;raw</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="valores">
+      <h2>Valores</h2>
+      <p><code>amount</code> é sempre string decimal canônica: sinal opcional, ponto, no mínimo 2 casas. Nunca float no caminho.</p>
+      <table>
+        <tr><th>No arquivo</th><th><code>amount</code></th></tr>
+        <tr><td><code>-1.234,56</code></td><td><code>"-1234.56"</code></td></tr>
+        <tr><td><code>1,234.56</code></td><td><code>"1234.56"</code></td></tr>
+        <tr><td><code>-50,00</code> / <code>+3.500,00</code></td><td><code>"-50.00"</code> / <code>"3500.00"</code></td></tr>
+        <tr><td><code>1500</code> / <code>,5</code></td><td><code>"1500.00"</code> / <code>"0.50"</code></td></tr>
+        <tr><td><code>50.00-</code> / <code>(50.00)</code></td><td><code>"-50.00"</code></td></tr>
+        <tr><td><code>1.234</code> (um separador só)</td><td><code>"1.234"</code> — a especificação manda ler como decimal</td></tr>
+      </table>
+      <p>Com ponto e vírgula presentes, o <strong>último</strong> é o decimal. Com um tipo só, uma ocorrência é decimal e várias são milhar. A direção vem do sinal: <code>&gt;= 0</code> é crédito, <code>&lt; 0</code> débito — o <code>TRNTYPE</code> é informativo (muitos bancos mandam <code>OTHER</code> ou erram).</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="datas">
+      <h2>Datas e fuso</h2>
+      <p>Aceita <code>20240115</code>, <code>202401151234</code>, <code>20240115123456.789</code>, <code>[-3:BRT]</code>, <code>[-03:EST]</code> (offset certo, nome errado — comum no Brasil), <code>[0:GMT]</code>, <code>[+5.30:IST]</code>, <code>[-3.5]</code>. Data impossível (<code>00000000</code>, 31/02) é erro.</p>
+      <div class="vs-grid">
+        <div class="vs-box yes">
+          <h4>local (padrão)</h4>
+          <p>Data e hora como no arquivo, no fuso da aplicação. <code>20240229233000[-3:BRT]</code> continua 29/02 23:30.</p>
+        </div>
+        <div class="vs-box no">
+          <h4>convert</h4>
+          <p>Aplica o offset e converte. Em UTC, o mesmo lançamento vira 01/03 02:30 — outro dia no extrato.</p>
+        </div>
+      </div>
+      <p>Extrato é o "dia do banco": use <code>local</code> salvo motivo forte. Na falta de <code>DTPOSTED</code> (Sicoob), a data vem de <code>DTUSER</code> ou do prefixo <code>AAAAMMDD</code> do FITID, com aviso <code>date_fallback</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="encoding">
+      <h2>Encoding e acentos</h2>
+      <p>O cabeçalho não é confiável — há banco que declara <code>USASCII</code>/<code>1252</code> e manda UTF-8. A regra:</p>
+      <ol>
+        <li>BOM UTF-8 é removido; UTF-16 (com ou sem BOM) é convertido.</li>
+        <li><code>encoding</code> na config, se definido, vence tudo.</li>
+        <li>Bytes que já são UTF-8 válido ficam como estão.</li>
+        <li>O resto é lido como Windows-1252 (superconjunto prático do ISO-8859-1: <code>€</code>, travessão, aspas curvas), salvo charset declarado diferente.</li>
+      </ol>
+      <p>Entidades (<code>&amp;amp;</code>, <code>&amp;#39;</code>, <code>&amp;nbsp;</code>) são decodificadas; <code>&amp;</code> solto fica como está. Espaços repetidos em MEMO/NAME são colapsados.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="deduplicacao">
+      <h2>Deduplicação</h2>
+      <p>Cada transação traz dois identificadores:</p>
+      <ul>
+        <li><code>fingerprint</code> — SHA-1 de tipo de extrato + conta + data + valor + descrição normalizada (sem acento, maiúscula) + número do documento + <strong>ocorrência</strong>. Duas tarifas idênticas no mesmo dia ganham fingerprints diferentes (1ª e 2ª ocorrência) e estáveis entre downloads.</li>
+        <li><code>uniqueId</code> — o FITID quando ele existe e é único no extrato (e o perfil confia nele); senão o fingerprint.</li>
+      </ul>
+      <div class="callout callout-warn">
+        <div class="callout-title">FITID não é confiável em todo banco</div>
+        <p>Em produção, Caixa manda a data como FITID (<code>271125</code>) e Unicred manda o tipo (<code>DEB PIX</code>), repetidos em dezenas de transações diferentes; BB reaproveita FITID no mesmo dia. Esses dois primeiros já vêm com perfil de fábrica <code>trust_fit_id =&gt; false</code>.</p>
+      </div>
+      <p>FITID — e portanto <code>uniqueId</code> — só é único <em>por conta</em>: o mesmo <code>X1</code> em duas contas do arquivo não é duplicidade. Misturando contas na mesma tabela, guarde junto <code>$statement-&gt;account-&gt;key()</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="configuracao">
+      <h2>Configuração</h2>
+      <p>Todas as chaves são opcionais (o que faltar cai no padrão). Valor inválido lança <code>PzOfxConfigException</code> na primeira leitura.</p>
+      <table>
+        <tr><th>Chave</th><th>Padrão</th><th>O que faz</th></tr>
+        <tr><td><code>strict</code></td><td><code>true</code></td><td>Transação sem data/valor legível derruba a leitura; <code>false</code> pula com aviso.</td></tr>
+        <tr><td><code>timezone</code></td><td><code>null</code></td><td>Fuso das datas; <code>null</code> = o da aplicação.</td></tr>
+        <tr><td><code>timezone_mode</code></td><td><code>local</code></td><td><code>local</code> ou <code>convert</code> (veja <a href="#datas">Datas</a>).</td></tr>
+        <tr><td><code>max_file_size</code></td><td>10 MB</td><td>Limite em bytes; <code>0</code> desliga.</td></tr>
+        <tr><td><code>encoding</code></td><td><code>null</code></td><td>Força o encoding de origem.</td></tr>
+        <tr><td><code>fix_inverted_period</code></td><td><code>true</code></td><td><code>DTSTART</code> depois de <code>DTEND</code> é invertido com aviso; <code>false</code> lança <code>inverted_period</code>.</td></tr>
+        <tr><td><code>balance_row_pattern</code></td><td>"SALDO" + qualificadores</td><td>Descrição inteira que identifica linha de saldo.</td></tr>
+        <tr><td><code>defaults</code></td><td>veja abaixo</td><td>Perfil padrão.</td></tr>
+        <tr><td><code>profiles</code></td><td>Caixa e Unicred</td><td>Perfis por banco; <code>[]</code> desliga os de fábrica.</td></tr>
+        <tr><td><code>locale</code></td><td><code>null</code></td><td>Idioma das mensagens; <code>null</code> segue a aplicação.</td></tr>
+      </table>
+      <p>Ajuste pontual numa leitura, sem tocar na config global:</p>
+<pre><code><span class="cls">PzOfx</span>::<span class="fn">fromFile</span>(<span class="var">$file</span>, [<span class="str">'strict'</span> =&gt; <span class="kw">false</span>, <span class="str">'defaults'</span> =&gt; [<span class="str">'description'</span> =&gt; <span class="str">'name_and_memo'</span>]]);
+
+<span class="cmt">// fora do Laravel: config global</span>
+<span class="cls">PzOfx</span>::<span class="fn">configure</span>([<span class="str">'timezone'</span> =&gt; <span class="str">'America/Sao_Paulo'</span>]);
+<span class="cls">PzOfx</span>::<span class="fn">useLocale</span>(<span class="str">'pt_BR'</span>);</code></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="perfis">
+      <h2>Perfis por banco</h2>
+      <p>O primeiro perfil cujo <code>match</code> bate é aplicado por cima de <code>defaults</code>. Critérios: <code>bank_id</code> (comparado pelo código: <code>0237</code> = <code>237</code>; em cartão, que não tem BANKID, vale o FID do sign-on), <code>org</code> (sem caixa e acento), <code>fid</code>, <code>statement</code> (<code>bank</code>/<code>credit_card</code>). Lista = qualquer um dos valores; vários critérios = todos.</p>
+      <table>
+        <tr><th>Opção</th><th>Valores</th></tr>
+        <tr><td><code>description</code></td><td><code>memo_or_name</code> (padrão), <code>name_or_memo</code>, <code>name_and_memo</code>, <code>memo</code>, <code>name</code></td></tr>
+        <tr><td><code>amount_sign</code></td><td><code>as_is</code> (padrão), <code>invert</code>, <code>by_type</code> (CREDIT/DEP/INT… positivo; DEBIT/FEE/POS… negativo)</td></tr>
+        <tr><td><code>trust_fit_id</code></td><td><code>true</code> (padrão) / <code>false</code> = sempre fingerprint</td></tr>
+        <tr><td><code>skip_balance_rows</code></td><td><code>true</code> (padrão) / <code>false</code></td></tr>
+      </table>
+<pre><code><span class="str">'profiles'</span> =&gt; [
+    [<span class="str">'match'</span> =&gt; [<span class="str">'bank_id'</span> =&gt; <span class="str">'104'</span>], <span class="str">'trust_fit_id'</span> =&gt; <span class="kw">false</span>],
+    [<span class="str">'match'</span> =&gt; [<span class="str">'bank_id'</span> =&gt; <span class="str">'136'</span>], <span class="str">'trust_fit_id'</span> =&gt; <span class="kw">false</span>],
+    [<span class="str">'match'</span> =&gt; [<span class="str">'bank_id'</span> =&gt; [<span class="str">'260'</span>, <span class="str">'336'</span>], <span class="str">'statement'</span> =&gt; <span class="str">'credit_card'</span>], <span class="str">'amount_sign'</span> =&gt; <span class="str">'invert'</span>],
+    [<span class="str">'match'</span> =&gt; [<span class="str">'org'</span> =&gt; <span class="str">'Banco Exemplo'</span>], <span class="str">'description'</span> =&gt; <span class="str">'name_and_memo'</span>],
+],</code></pre>
+      <p>O perfil efetivamente usado fica em <code>$statement-&gt;profile</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="avisos">
+      <h2>Avisos e modo estrito</h2>
+      <p><code>$document-&gt;warnings</code> lista o que veio fora do padrão, com <code>code</code> (<code>PzOfxWarningEnum</code>), <code>context</code> e <code>message()</code> traduzida:</p>
+      <table>
+        <tr><th>Código</th><th>Quando</th></tr>
+        <tr><td><code>balance_row_skipped</code></td><td>Linha "SALDO ANTERIOR"/"SALDO TOTAL DISPONÍVEL DIA" ignorada.</td></tr>
+        <tr><td><code>duplicate_fit_id</code></td><td>Mesmo FITID em várias transações do extrato.</td></tr>
+        <tr><td><code>missing_fit_id</code></td><td>Transações sem FITID.</td></tr>
+        <tr><td><code>date_fallback</code></td><td>Sem DTPOSTED; data de DTUSER ou do FITID.</td></tr>
+        <tr><td><code>unknown_transaction_type</code></td><td>TRNTYPE fora da especificação (vira <code>OTHER</code>, valor em <code>rawType</code>).</td></tr>
+        <tr><td><code>period_inverted</code></td><td><code>DTSTART</code> depois de <code>DTEND</code>; as datas foram trocadas.</td></tr>
+        <tr><td><code>status_not_ok</code></td><td><code>&lt;STATUS&gt;</code> com código diferente de 0.</td></tr>
+        <tr><td><code>invalid_optional_field</code></td><td>DTSTART, DTUSER, saldo… ilegível; ignorado.</td></tr>
+        <tr><td><code>transaction_skipped</code></td><td>Só com <code>strict =&gt; false</code>: transação sem data/valor legível pulada.</td></tr>
+      </table>
+      <div class="callout callout-danger">
+        <div class="callout-title">Por que strict é o padrão</div>
+        <p>Em conciliação, importar o extrato sem uma transação é pior que recusar o arquivo: o saldo não fecha e ninguém sabe por quê. Desligue só com o aviso visível para o usuário.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="erros">
+      <h2>Erros e exceções</h2>
+      <p>Todas estendem <code>PzOfxException</code> (<code>RuntimeException</code>). Decida pelo código, não pela mensagem:</p>
+<pre><code><span class="kw">try</span> {
+    <span class="var">$document</span> = <span class="cls">PzOfx</span>::<span class="fn">fromFile</span>(<span class="var">$file</span>);
+} <span class="kw">catch</span> (<span class="cls">PzOfxException</span> <span class="var">$e</span>) {
+    <span class="var">$e</span>-&gt;<span class="fn">error</span>();     <span class="cmt">// PzOfxErrorEnum::INVALID_AMOUNT</span>
+    <span class="var">$e</span>-&gt;<span class="fn">context</span>();   <span class="cmt">// ['index' =&gt; 3, 'field' =&gt; 'TRNAMT', 'value' =&gt; 'abc']</span>
+    <span class="var">$e</span>-&gt;<span class="fn">getMessage</span>(); <span class="cmt">// "A transação 3 tem TRNAMT inválido: "abc"."</span>
+}</code></pre>
+      <table>
+        <tr><th>Exceção</th><th>Códigos</th></tr>
+        <tr><td><code>PzOfxFileException</code></td><td><code>file_not_informed</code>, <code>file_not_found</code>, <code>file_not_readable</code>, <code>file_too_large</code>, <code>file_empty</code></td></tr>
+        <tr><td><code>PzOfxParseException</code></td><td><code>not_ofx</code>, <code>unsupported_encoding</code>, <code>missing_field</code>, <code>invalid_date</code>, <code>invalid_amount</code>, <code>inverted_period</code> (só com <code>fix_inverted_period =&gt; false</code>), <code>no_statement</code></td></tr>
+        <tr><td><code>PzOfxConfigException</code></td><td><code>invalid_config</code></td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="laravel">
+      <h2>Laravel e injeção</h2>
+      <ul>
+        <li><strong>Config</strong>: <code>config('pzofx')</code> mesclada; publique com a tag <code>pzofx-config</code>. <code>timezone =&gt; null</code> usa <code>app.timezone</code>.</li>
+        <li><strong>Injeção</strong>: injete <code>PzOfxParserInterface</code> (recomendado) ou <code>PzOfxParser</code> — os dois resolvem para o <strong>mesmo singleton</strong>, com a config da aplicação. <code>PzOfxConfig</code> também é singleton.</li>
+        <li><strong>Estático</strong>: <code>PzOfx::</code> usa o parser do container, então mock ou fake no container vale para os dois estilos.</li>
+        <li><strong>Idioma</strong>: <code>locale =&gt; null</code> segue <code>app.locale</code> a cada mensagem.</li>
+        <li><strong>Validação</strong>: <code>new PzOfxFileRule()</code> — arquivo legível, com extrato e com transações (<code>requireTransactions: false</code> aceita extrato vazio). O documento lido fica em <code>$rule-&gt;document()</code>.</li>
+      </ul>
+<pre><code><span class="kw">use</span> <span class="cls">Puzl\PzOfx\Contracts\PzOfxParserInterface</span>;
+
+<span class="kw">public function</span> <span class="fn">__construct</span>(<span class="kw">private readonly</span> <span class="cls">PzOfxParserInterface</span> <span class="var">$parser</span>) {}
+
+<span class="var">$document</span> = <span class="var">$this</span>-&gt;parser-&gt;<span class="fn">parseFile</span>(<span class="var">$dto</span>-&gt;file);
+
+<span class="cmt">// ajuste só desta leitura (devolve outra instância; o singleton não muda)</span>
+<span class="var">$document</span> = <span class="var">$this</span>-&gt;parser-&gt;<span class="fn">withConfig</span>([<span class="str">'strict'</span> =&gt; <span class="kw">false</span>])-&gt;<span class="fn">parseFile</span>(<span class="var">$file</span>);</code></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="testando">
+      <h2>Testando</h2>
+      <p>Código que usa o PzOfx pode ser testado de cinco jeitos — escolha por teste, não por projeto.</p>
+
+      <h3>1. Lib real (recomendado para o fluxo de importação)</h3>
+      <p>O parser não usa banco, rede nem disco quando recebe conteúdo: o teste é rápido e cobre o comportamento de verdade.</p>
+<pre><code><span class="var">$file</span> = <span class="cls">UploadedFile</span>::<span class="fn">fake</span>()-&gt;<span class="fn">createWithContent</span>(<span class="str">'extrato.ofx'</span>, <span class="fn">file_get_contents</span>(<span class="fn">base_path</span>(<span class="str">'tests/Fixtures/itau.ofx'</span>)));
+
+<span class="var">$this</span>-&gt;<span class="fn">postJson</span>(<span class="str">'/bank-reconciliations/import-ofx'</span>, [<span class="str">'file'</span> =&gt; <span class="var">$file</span>, <span class="str">'bank_account_id'</span> =&gt; <span class="var">$account</span>-&gt;id])
+    -&gt;<span class="fn">assertOk</span>();</code></pre>
+
+      <h3>2. Builder — dados controlados sem escrever OFX</h3>
+      <p><code>PzOfxDocumentBuilder</code> gera o OFX e o passa pelo parser real: o documento sai igual ao de produção (fingerprint, <code>uniqueId</code>, perfis da config). <code>toOfx()</code> devolve o arquivo, para usar como upload.</p>
+<pre><code><span class="kw">use</span> <span class="cls">Puzl\PzOfx\Testing\PzOfxDocumentBuilder</span>;
+
+<span class="var">$document</span> = <span class="cls">PzOfxDocumentBuilder</span>::<span class="fn">bank</span>(<span class="str">'341'</span>, <span class="str">'12345-6'</span>)
+    -&gt;<span class="fn">transaction</span>(<span class="str">'-50.00'</span>, <span class="str">'2024-01-15'</span>, <span class="str">'TARIFA'</span>)
+    -&gt;<span class="fn">transaction</span>(<span class="str">'1500.00'</span>, <span class="str">'2024-01-16'</span>, name: <span class="str">'PIX RECEBIDO'</span>, fitId: <span class="str">'F2'</span>)
+    -&gt;<span class="fn">ledgerBalance</span>(<span class="str">'1450.00'</span>)
+    -&gt;<span class="fn">build</span>();
+
+<span class="var">$ofx</span> = <span class="cls">PzOfxDocumentBuilder</span>::<span class="fn">creditCard</span>()-&gt;<span class="fn">transaction</span>(<span class="str">'-59.90'</span>)-&gt;<span class="fn">toOfx</span>();</code></pre>
+      <p>Também: <code>addBankStatement()</code> / <code>addCreditCardStatement()</code> (vários extratos), <code>institution($org, $fid)</code> (escolha de perfil), <code>currency()</code>; na transação, <code>fitId: ''</code> omite o FITID e <code>type:</code> força o TRNTYPE.</p>
+
+      <h3>3. Fake — no estilo <code>Http::fake()</code></h3>
+<pre><code><span class="kw">use</span> <span class="cls">Puzl\PzOfx\PzOfx</span>;
+
+<span class="cls">PzOfx</span>::<span class="fn">fake</span>([<span class="var">$document</span>]);                     <span class="cmt">// toda leitura devolve $document</span>
+<span class="cls">PzOfx</span>::<span class="fn">fake</span>([<span class="var">$primeiro</span>, <span class="var">$segundo</span>]);            <span class="cmt">// em ordem; acabou, repete o último</span>
+<span class="cls">PzOfx</span>::<span class="fn">fake</span>(<span class="cls">PzOfxErrorEnum</span>::NOT_OFX);           <span class="cmt">// lança a exceção certa (Parse/File/Config)</span>
+<span class="cls">PzOfx</span>::<span class="fn">fake</span>();                                 <span class="cmt">// espião: lê de verdade e só registra</span>
+
+<span class="cmt">// ... executa o código ...</span>
+
+<span class="cls">PzOfx</span>::<span class="fn">assertParsed</span>();
+<span class="cls">PzOfx</span>::<span class="fn">assertParsedTimes</span>(1);
+<span class="cls">PzOfx</span>::<span class="fn">assertNothingParsed</span>();
+<span class="cls">PzOfx</span>::<span class="fn">assertParsed</span>(<span class="kw">fn</span> (<span class="var">$input</span>, <span class="var">$method</span>, <span class="var">$config</span>) =&gt; <span class="var">$method</span> === <span class="str">'parseFile'</span>);</code></pre>
+      <p>O fake vale para <code>PzOfx::</code>, para quem injeta <code>PzOfxParserInterface</code> ou <code>PzOfxParser</code>, para o <code>PzOfxLegacy</code> e para a <code>PzOfxFileRule</code>.</p>
+      <div class="callout callout-warn">
+        <div class="callout-title">Chame o fake antes de resolver o serviço</div>
+        <p>Como em todo fake do Laravel: o serviço resolvido do container <em>depois</em> de <code>PzOfx::fake()</code> recebe o fake; um já resolvido antes continua com o parser real.</p>
+      </div>
+
+      <h3>4. Mock (Mockery / PHPUnit)</h3>
+<pre><code><span class="cmt">// pelo container — vale para injeção e para PzOfx::</span>
+<span class="var">$this</span>-&gt;<span class="fn">mock</span>(<span class="cls">PzOfxParserInterface</span>::<span class="kw">class</span>)
+    -&gt;<span class="fn">shouldReceive</span>(<span class="str">'parseFile'</span>)-&gt;<span class="fn">once</span>()-&gt;<span class="fn">andReturn</span>(<span class="var">$document</span>);
+
+<span class="cmt">// sem container</span>
+<span class="var">$parser</span> = <span class="var">$this</span>-&gt;<span class="fn">createMock</span>(<span class="cls">PzOfxParserInterface</span>::<span class="kw">class</span>);
+<span class="var">$parser</span>-&gt;<span class="fn">method</span>(<span class="str">'parseFile'</span>)-&gt;<span class="fn">willThrowException</span>(<span class="cls">PzOfxParseException</span>::<span class="fn">because</span>(<span class="cls">PzOfxErrorEnum</span>::NOT_OFX));
+<span class="var">$service</span> = <span class="kw">new</span> <span class="cls">ImportOfxService</span>(<span class="var">$parser</span>);</code></pre>
+      <p>Mocke o tipo que o serviço injeta. Mock de <code>PzOfxParser</code> (concreta, não é <code>final</code>) também alcança quem injeta a interface; o contrário não.</p>
+
+      <h3>5. Documento de retorno</h3>
+      <p>As classes de <code>Data</code> são <code>final</code> e imutáveis — não precisam de mock. Para o mock/fake devolver algo, use o builder ou uma fixture: <code>(new PzOfxParser())-&gt;parseString($ofx)</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="pegadinhas">
+      <h2>Pegadinhas dos bancos</h2>
+      <p>Levantadas em pesquisa (issues de parsers como ofxtools, ofxparse, asgrim/ofxparser, KMyMoney, GnuCash) e conferidas nas ~408 mil linhas importadas por OFX em produção:</p>
+      <table>
+        <tr><th>Banco / origem</th><th>O que acontece</th><th>Como o PzOfx trata</th></tr>
+        <tr><td>Itaú, BB</td><td>"SALDO ANTERIOR", "SALDO TOTAL DISPONÍVEL DIA", "SALDO BLOQUEADO" como STMTTRN, com FITID e o valor do saldo (até R$ 1,1 mi como crédito)</td><td>Ignoradas com aviso; "JUROS SALDO DEVEDOR", "SALDO PAGAMENTO COLABORADORES" (Sicredi) continuam</td></tr>
+        <tr><td>Caixa, Unicred, BB, Daycoval</td><td>FITID repetido em transações diferentes</td><td><code>uniqueId</code> cai no fingerprint; perfis de fábrica para Caixa e Unicred</td></tr>
+        <tr><td>Itaú, Bradesco</td><td>Hora fixa (<code>100000[-03:EST]</code>), nome de fuso errado</td><td>Modo <code>local</code> preserva exatamente</td></tr>
+        <tr><td>Sicoob</td><td>STMTTRN sem DTPOSTED</td><td>DTUSER ou data do FITID, com aviso</td></tr>
+        <tr><td>Nubank, outros</td><td>UTF-8 com cabeçalho dizendo 1252</td><td>UTF-8 válido é respeitado</td></tr>
+        <tr><td>Vários</td><td>Arquivo numa linha só, <code>&lt;SEVERITY&gt;INFO&lt;/STATUS&gt;</code>, <code>&lt;TRNTYPE&gt;</code> vazio, tags minúsculas, HTML de erro depois do <code>&lt;/OFX&gt;</code></td><td>Tokenizador ignora quebras e fecha implicitamente</td></tr>
+        <tr><td>Vários</td><td>Do mais novo ao mais antigo (no leitor legado gerou centenas de conciliações com início depois do fim)</td><td><code>period()</code> é sempre menor e maior data; <code>sortedByDate()</code></td></tr>
+        <tr><td>Vários</td><td><code>DTSTART</code> depois de <code>DTEND</code></td><td>Invertido sozinho, com aviso; <code>fix_inverted_period =&gt; false</code> transforma em erro</td></tr>
+        <tr><td>Bancos BR</td><td>Vírgula decimal, milhar com ponto</td><td><a href="#valores">Valores</a></td></tr>
+        <tr><td>Cartões</td><td>Compras positivas em alguns emissores</td><td>Perfil com <code>amount_sign</code></td></tr>
+        <tr><td>Caixa</td><td>Descrição só no NAME (MEMO vazio)</td><td><code>memo_or_name</code></td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="migracao">
+      <h2>Migrando do Ofx.php</h2>
+      <p><code>Puzl\PzOfx\Compat\PzOfxLegacy</code> é substituto direto do <code>App\Library\Ofx\Ofx</code>: mesmo construtor, mesmas propriedades (<code>bankTransactions</code>, <code>startAt</code>, <code>endAt</code>, <code>bankCode</code>, <code>account</code>, <code>accountDigit</code>, <code>org</code>), mesmo formato de linha e as mesmas chaves de tradução (<code>exceptions.file_not_informed</code>, <code>validation_financial.bank_reconciliations.ofx_file_transactions_is_empty</code>).</p>
+<pre><code><span class="kw">use</span> <span class="cls">Puzl\PzOfx\Compat\PzOfxLegacy</span> <span class="kw">as</span> <span class="cls">Ofx</span>;   <span class="cmt">// era: use App\Library\Ofx\Ofx;</span>
+
+<span class="var">$ofx</span> = <span class="kw">new</span> <span class="cls">Ofx</span>(<span class="var">$request</span>-&gt;file);
+<span class="var">$ofx</span>-&gt;bankTransactions;   <span class="cmt">// mesmas chaves: type, date_at, value, fit_id, check_num, ref_number, description</span>
+<span class="var">$ofx</span>-&gt;<span class="fn">document</span>();        <span class="cmt">// o PzOfxDocument completo, para migrar aos poucos</span></code></pre>
+      <p>Onde o leitor antigo lia certo, o resultado é idêntico — há teste contra uma cópia fiel do <code>Ofx.php</code>. Arquivo inválido lança <code>PzOfxException</code> com mensagem que não é chave de tradução, então o service atual continua mostrando <code>invalid_ofx_file</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="diferencas">
+      <h2>Diferenças de comportamento</h2>
+      <table>
+        <tr><th>Situação</th><th>Ofx.php</th><th>PzOfxLegacy</th></tr>
+        <tr><td>Acentos</td><td>removidos (<code>TRANSFERNCIA</code>) — ~16 mil linhas em produção</td><td>preservados (a busca continua achando: collation ignora acento)</td></tr>
+        <tr><td><code>&amp;</code> e <code>#</code></td><td>apagados</td><td>preservados</td></tr>
+        <tr><td>Emoji / 4 bytes</td><td>apagados</td><td>apagados (colunas <code>utf8mb3</code>)</td></tr>
+        <tr><td>Arquivo numa linha, fechamento trocado, <code>&amp;</code> solto</td><td>"String could not be parsed as XML"</td><td>lido</td></tr>
+        <tr><td>Linhas de saldo (Itaú, BB)</td><td>importadas como transação</td><td>ignoradas</td></tr>
+        <tr><td>Ordem decrescente</td><td><code>startAt</code> &gt; <code>endAt</code></td><td>menor e maior data</td></tr>
+        <tr><td><code>1,234.56</code></td><td><code>1</code></td><td><code>"1234.56"</code></td></tr>
+        <tr><td><code>value</code></td><td>string (ponto) ou float (vírgula)</td><td>sempre string exata</td></tr>
+        <tr><td>MEMO vazio com NAME</td><td>descrição vazia</td><td>NAME</td></tr>
+        <tr><td>Sem DTPOSTED</td><td>erro</td><td>DTUSER/FITID</td></tr>
+        <tr><td><code>description</code> &gt; 255, <code>check_num</code> &gt; 55</td><td>"Data too long"</td><td>truncados</td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="seguranca">
+      <h2>Segurança e limites</h2>
+      <ul>
+        <li><strong>Sem libxml</strong>: <code>&lt;!DOCTYPE&gt;</code> e entidades externas são descartados, não expandidos — sem XXE nem billion laughs.</li>
+        <li><strong>Tamanho</strong>: <code>max_file_size</code> (10 MB ≈ 85 mil transações) checado antes de ler o arquivo e em streams. A leitura usa até ~35× o tamanho do arquivo em memória.</li>
+        <li><strong>Profundidade</strong>: aninhamento limitado a 64 níveis; aggregate que se repete fecha o anterior.</li>
+        <li><strong>Memória</strong>: folhas não viram objeto; 20 mil transações cabem nos 128 MB padrão do PHP.</li>
+        <li><strong>Texto malformado</strong>: <code>&lt;!--</code> ou <code>&lt;![CDATA[</code> sem fechamento num MEMO viram texto, não engolem o arquivo; tags soltas absorvidas em MEMO/NAME têm teto (sem custo quadrático).</li>
+        <li><strong>Regra de validação</strong>: aceita upload ou conteúdo, nunca caminho — string da requisição não aponta arquivo do servidor.</li>
+        <li><strong>Saída</strong>: MEMO/NAME vêm do banco — escape ao exibir em HTML e cuidado com <code>=</code>, <code>+</code>, <code>@</code> no começo ao exportar para planilha.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="api">
+      <h2>API resumida</h2>
+      <div class="method"><div class="method-sig">PzOfx::fromFile(string|SplFileInfo|null $file, array|PzOfxConfig|null $config = null): PzOfxDocument</div><p class="method-desc">Caminho ou UploadedFile.</p></div>
+      <div class="method"><div class="method-sig">PzOfx::fromString(string $content, ...): PzOfxDocument</div><p class="method-desc">Conteúdo em qualquer encoding.</p></div>
+      <div class="method"><div class="method-sig">PzOfx::fromStream(resource $stream, ...): PzOfxDocument</div><p class="method-desc">Stream aberto, lido da posição atual.</p></div>
+      <div class="method"><div class="method-sig">PzOfx::parse(mixed $input, ...): PzOfxDocument</div><p class="method-desc">Detecta: stream, conteúdo (tem <code>&lt;</code> ou quebra de linha) ou caminho.</p></div>
+      <div class="method"><div class="method-sig">PzOfx::parser(?array $config = null): PzOfxParserInterface</div><p class="method-desc">O parser em uso (fake, container ou config global), opcionalmente ajustado.</p></div>
+      <div class="method"><div class="method-sig">PzOfx::fake($responses = null): PzOfxFake · assertParsed(?callable) · assertParsedTimes(int) · assertNothingParsed()</div><p class="method-desc">Fake para testes (veja <a href="#testando">Testando</a>).</p></div>
+      <div class="method"><div class="method-sig">PzOfx::configure(array|PzOfxConfig $config) · PzOfx::useLocale(string|Closure $locale) · PzOfx::reset()</div><p class="method-desc">Estado global (fora do Laravel ou em testes).</p></div>
+      <div class="method"><div class="method-sig">PzOfxParserInterface → config / withConfig / parseFile / parseString / parseStream / parse</div><p class="method-desc">Contrato para injetar; implementado por <code>PzOfxParser</code> (<code>new PzOfxParser(?PzOfxConfig)</code>) e <code>PzOfxFake</code>.</p></div>
+      <div class="method"><div class="method-sig">PzOfxDocumentBuilder::bank(...) / ::creditCard(...) → transaction / ledgerBalance / institution / build / toOfx</div><p class="method-desc">Documentos de teste pelo parser real.</p></div>
+      <div class="method"><div class="method-sig">PzOfxConfig::fromArray(array) · ::default() · -&gt;with(array) · -&gt;profileFor(...)</div><p class="method-desc">Config imutável.</p></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="faq">
+      <h2>FAQ</h2>
+      <h4>Por que <code>amount</code> é string?</h4>
+      <p>Float erra soma (<code>0.1 + 0.2</code>). Para gravar em coluna decimal, passe a string direto; para inteiro, <code>amountCents()</code>.</p>
+      <h4>O TRNTYPE diz CREDIT mas o valor é negativo. Quem vale?</h4>
+      <p>O sinal. Se um banco inverte de forma sistemática, crie um perfil com <code>amount_sign</code>.</p>
+      <h4>O mesmo arquivo importado duas vezes?</h4>
+      <p>Guarde <code>uniqueId</code> com índice único por conta, ou bloqueie por período como a API faz hoje.</p>
+      <h4>Investimentos (INVSTMTRS)?</h4>
+      <p>Fora do escopo: o arquivo é lido sem erro, mas só extratos de conta e cartão viram <code>PzOfxStatement</code>.</p>
+      <h4>Arquivo .ofc?</h4>
+      <p>OFC é o formato antecessor; não é suportado (<code>not_ofx</code>). Peça ao banco o OFX.</p>
+    </section>
+
+    <footer>
+      PzOfx · <code>puzl/pzofx</code> · documento em <code>docs/index.html</code> · repositório <a href="https://github.com/PuzlPlace/PzOfx">PuzlPlace/PzOfx</a>. Mudou o comportamento do pacote? Atualize este guia no mesmo PR.
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // ---------- Sumário: destaque da seção atual ----------
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.sidebar a');
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((link) => link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id));
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach((s) => spy.observe(s));
+
+  // ---------- Menu no celular ----------
+  const sidebar = document.querySelector('.sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', () => {
+    const open = sidebar.classList.toggle('open');
+    menuBtn.setAttribute('aria-expanded', String(open));
+  });
+  navLinks.forEach((link) => link.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }));
+
+  // ---------- Barra de progresso ----------
+  const bar = document.getElementById('progress');
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement;
+    bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%';
+  }, { passive: true });
+
+  // ---------- Botão copiar nos blocos de código ----------
+  document.querySelectorAll('pre').forEach((pre) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'copiar';
+    btn.className = 'copy-btn';
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(pre.querySelector('code').innerText); btn.textContent = 'copiado ✓'; }
+      catch { btn.textContent = 'falhou'; }
+      setTimeout(() => (btn.textContent = 'copiar'), 1500);
+    });
+    pre.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>
